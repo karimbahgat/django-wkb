@@ -67,6 +67,42 @@ class RealWordTestCase(TestCase):
 
         self.assertTrue(True)
 
+#####
+
+class BaseWKBGeometryTest(object):
+
+    def test_geom_type(self):
+        self.assertEquals(self.geom.geom_type, self.geom_type)
+
+    def test_bbox(self):
+        self.assertEquals(self.geom.bbox(), self.bbox)
+
+    def test_geo_interface(self):
+        self.assertDictEqual(self.geom.__geo_interface__, self.geoj)
+
+    def test_geojson(self):
+        self.assertJSONEqual(self.geom.geojson, json.dumps(self.geoj))
+
+class PointWKBGeometryTest(BaseWKBGeometryTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.geoj = {'type': 'Point', 'coordinates': (0.0, 0.0)}
+        cls.bbox = (0.0,0.0,0.0,0.0)
+        cls.geom_type = cls.geoj['type']
+        cls.geom = WKBGeometry.from_geojson(cls.geoj)
+
+class LineStringWKBGeometryTest(BaseWKBGeometryTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.geoj = {'type': 'LineString', 'coordinates': ((0.0, 0.0),(1.0,1.0),(2.0,2.0))}
+        cls.bbox = (0.0,0.0,2.0,2.0)
+        cls.geom_type = cls.geoj['type']
+        cls.geom = WKBGeometry.from_geojson(cls.geoj)
+
+#####
+
 class BaseModelFieldTest(object):
 
     def test_field_value_is_wkbgeometry(self):
@@ -231,14 +267,14 @@ class BaseModelFieldTest(object):
 ##                }]
 ##            })
 
-class ModelFieldTestFromWKBGeometry(BaseModelFieldTest, TestCase):
+class ModelFieldFromWKBGeometryTest(BaseModelFieldTest, TestCase):
     
     @classmethod
     def setUpTestData(cls):
         geom = WKBGeometry.from_geojson({'type': 'Point', 'coordinates': [0, 0]})
         cls.address = Address.objects.create(geom=geom)
 
-class ModelFieldTestFromGeoJSONDict(BaseModelFieldTest, TestCase):
+class ModelFieldFromGeoJSONDictTest(BaseModelFieldTest, TestCase):
     
     @classmethod
     def setUpTestData(cls):

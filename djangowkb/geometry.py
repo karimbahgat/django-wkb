@@ -130,6 +130,7 @@ class WKBGeometry(object):
         wkb = pack(fmt, *vals)
         return WKBGeometry(wkb)
 
+    @property
     def geom_type(self):
         byteorder = _wkb_byteorder(self.wkb)
         typ = unpack_from(byteorder+'xi', self.wkb)[0]
