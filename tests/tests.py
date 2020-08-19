@@ -1,13 +1,26 @@
-from django.test import TestCase
-from django.db import transaction
-from .models import CountryDivision
+# Most of the tests in this file are adapted from django-geosjon
+# https://github.com/makinacorpus/django-geojson/blob/master/djgeojson/tests.py
 
+from django.test import TestCase
+from django.template import Template, Context
+from django.db import transaction
+from django.core import serializers
+from django.core.exceptions import ValidationError, SuspiciousOperation
+
+import json
+
+from djangowkb.geometry import WKBGeometry
+from djangowkb.fields import WKBField, WKBFormField, HAS_LEAFLET
+
+from .models import Address, CountryDivision
+from .forms import AddressForm
 
 
 # Create your tests here.
-class BasicTestCase(TestCase):
+class RealWordTestCase(TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         pass
     
     def test_example(self):
@@ -18,8 +31,9 @@ class BasicTestCase(TestCase):
         import sys
         sys.path.append(r'C:\Users\kimok\OneDrive\Documents\GitHub\pyshp')
         import shapefile
-        r = shapefile.Reader(r"C:\Users\kimok\Downloads\ne_10m_admin_1_states_provinces (1)\ne_10m_admin_1_states_provinces.shp")
-        #r = shapefile.Reader(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
+        #r = shapefile.Reader(r"C:\Users\kimok\Downloads\ne_10m_admin_1_states_provinces (1)\ne_10m_admin_1_states_provinces.shp")
+        r = shapefile.Reader(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
+        #r = shapefile.Reader(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_urban_extent_polygons_v1.01.shp")
         shapes = r.shapes()
         items = [shape.__geo_interface__ for shape in shapes] # items = [(i+1, f.bbox) for i,f in enumerate(d)]
         print(len(items))
@@ -51,6 +65,185 @@ class BasicTestCase(TestCase):
             print('geojson',str(geoj)[:100])
             print('bbox',obj.geom.bbox())
 
+        self.assertTrue(True)
 
+class BaseModelFieldTest(object):
+
+    def test_field_value_is_wkbgeometry(self):
+        self.assertIsInstance(self.address.geom, WKBGeometry)
+
+    def test_field_value_accepts_geojson_dict(self):
+        pass
+
+    def test_field_value_accepts_geojson_string(self):
+        pass
+
+    def test_field_value_accepts_wkbgeometry(self):
+        pass
+
+    def test_model_can_save(self):
+        pass
+
+    def test_model_can_create(self):
+        pass
+
+    def test_model_can_bulk_create(self):
+        pass
+
+    def test_form_field_default_is_wkbfield(self):
+        field = self.address._meta.get_field('geom').formfield()
+        self.assertIsInstance(field, WKBFormField)
+
+    def test_form_field_widget_default_is_leaflet(self):
+        if HAS_LEAFLET:
+            from djangowkb.fields import LeafletWidget
+            field = self.address._meta.get_field('geom').formfield()
+            self.assertIsInstance(field.widget, LeafletWidget)
+
+    def test_form_field_widget_renders_as_map(self):
+##        client = Client()
+##        url = reverse('index')
+##        response = self.client.get(url)
+##        self.assertEqual(response.status_code, 200)
+##        self.assertTemplateUsed(response, 'index.html')
+##        self.assertContains(response, 'Company Name XYZ')
+        inst = self.address
+        form = AddressForm(instance=inst)
+        #raise Exception(repr(inst.geom))
+        #raise Exception(repr(form.geom))
+        #raise Exception(form.as_p())
+        templ = Template('''
+{% load leaflet_tags %}
+
+{% block page_content %}
+
+{% block extra_assets %}
+   {% leaflet_js plugins="forms" %}
+   {% leaflet_css plugins="forms" %}
+{% endblock %}
+
+<h1>Map Test Template</h1>
+
+<div id="map_container">
+{{ form }}
+</div>
+
+{% endblock %}
+''')
+        context = Context({'form':form})
+        html = templ.render(context) + ''
+##        from django.utils.safestring import mark_safe
+##        html = mark_safe(html)
+##        raise Exception(html)
+##        #raise Exception(type(html))
+##        textarea_tag = html.index('<textarea id="id_geom"')
+##        start = html.index('>', textarea_tag) + 1
+##        end = html.index('<', start)
+##        textarea_content = html[start:end]
+##        from django.utils.html import escape,unquote
+##        raise Exception(textarea_content)
+##        geojson = inst.geom.geojson
+##        self.assertEquals(textarea_content, geojson)
+##        self.assertContains(html, geojson)
+        self.assertIn('<textarea id="id_geom"', html)
+        self.assertIn('map = L.Map.', html)
+
+    # below is adapted
+
+    def test_models_can_have_geojson_fields(self):
+        saved = Address.objects.get(id=self.address.id)
+        self.assertEqual(saved.geom.wkb, self.address.geom.wkb)
+##        if isinstance(saved.geom, dict):
+##            self.assertDictEqual(saved.geom, self.address.geom)
+##        else:
+##            # Django 1.8 !
+##            self.assertEqual(json.loads(saved.geom.geojson), self.address.geom)
+
+##    def test_default_form_field_has_geojson_validator(self):
+##        field = self.address._meta.get_field('geom').formfield()
+##        validator = field.validators[0]
+##        self.assertTrue(isinstance(validator, GeoJSONValidator))
+
+    def test_form_field_raises_if_invalid_type(self):
+        field = self.address._meta.get_field('geom').formfield()
+        self.assertRaises(ValidationError, field.clean,
+                          {'type': 'FeatureCollection', 'foo': 'bar'})
+
+    def test_form_field_raises_if_type_missing(self):
+        field = self.address._meta.get_field('geom').formfield()
+        self.assertRaises(ValidationError, field.clean,
+                          {'foo': 'bar'})
+
+##    def test_field_can_be_serialized(self):
+##        serializer = Serializer()
+##        geojson = serializer.serialize(Address.objects.all(), crs=False)
+##        features = json.loads(geojson)
+##        self.assertEqual(
+##            features, {
+##                'type': u'FeatureCollection',
+##                'features': [{
+##                    'id': self.address.id,
+##                    'type': 'Feature',
+##                    'geometry': {'type': 'Point', 'coordinates': [0, 0]},
+##                    'properties': {
+##                        'model': 'djgeojson.address'
+##                    }
+##                }]
+##            })
+
+##    def test_field_can_be_deserialized(self):
+##        input_geojson = """
+##        {"type": "FeatureCollection",
+##         "features": [
+##            { "type": "Feature",
+##                "properties": {"model": "djgeojson.address"},
+##                "id": 1,
+##                "geometry": {
+##                    "type": "Point",
+##                    "coordinates": [0.0, 0.0]
+##                }
+##            }
+##        ]}"""
+##        objects = list(serializers.deserialize('geojson', input_geojson))
+##        self.assertEqual(objects[0].object.geom,
+##                         {'type': 'Point', 'coordinates': [0, 0]})
+
+##    def test_model_can_be_omitted(self):
+##        serializer = Serializer()
+##        geojson = serializer.serialize(Address.objects.all(),
+##                                       with_modelname=False)
+##        features = json.loads(geojson)
+##        self.assertEqual(
+##            features, {
+##                "crs": {
+##                    "type": "link",
+##                    "properties": {
+##                        "href": "http://spatialreference.org/ref/epsg/4326/",
+##                        "type": "proj4"
+##                    }
+##                },
+##                'type': 'FeatureCollection',
+##                'features': [{
+##                    'id': self.address.id,
+##                    'type': 'Feature',
+##                    'geometry': {'type': 'Point', 'coordinates': [0, 0]},
+##                    'properties': {}
+##                }]
+##            })
+
+class ModelFieldTestFromWKBGeometry(BaseModelFieldTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        geom = WKBGeometry.from_geojson({'type': 'Point', 'coordinates': [0, 0]})
+        cls.address = Address.objects.create(geom=geom)
+
+class ModelFieldTestFromGeoJSONDict(BaseModelFieldTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        geom = WKBGeometry({'type': 'Point', 'coordinates': [0, 0]})
+        cls.address = Address.objects.create(geom=geom)
+        
 
             

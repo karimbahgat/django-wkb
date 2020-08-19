@@ -3,6 +3,7 @@
 from struct import unpack, unpack_from, pack
 from io import BytesIO
 from itertools import islice,chain
+import json
 
 
 def _wkb_byteorder(wkb):
@@ -30,7 +31,8 @@ shptype_to_wkbtype = {'Point': 1,
 
 class WKBGeometry(object):
 
-    def __init__(self, wkb):
+    def __init__(self, wkb, srid=None):
+        self.srid = srid
         self.wkb = wkb
 
     @property
@@ -40,11 +42,10 @@ class WKBGeometry(object):
         geoj = shp.__geo_interface__
         return geoj
 
-##    def type(self):
-##        byteorder = _wkb_byteorder(self._wkb)
-##        typ = unpack_from(byteorder+'xi', self._wkb)[0]
-##        typ = wkbtype_to_shptype[typ]
-##        return typ
+    @property
+    def geojson(self):
+        json_string = json.dumps(self.__geo_interface__)
+        return json_string
 
     @staticmethod
     def from_geojson(geojson):
@@ -63,7 +64,7 @@ class WKBGeometry(object):
             pnum = len(ring)
             vals.append(pnum)
             #vals.extend((xy for p in ring for xy in p))
-            vals.extend(chain(*ring))
+            vals.extend(chain.from_iterable(ring))
             return 'i{}d'.format(pnum*2)
         
         def writepoly(poly):#, stream):
@@ -127,7 +128,13 @@ class WKBGeometry(object):
             raise NotImplementedError('Geometry type {}'.format(typ))
 
         wkb = pack(fmt, *vals)
-        return wkb
+        return WKBGeometry(wkb)
+
+    def geom_type(self):
+        byteorder = _wkb_byteorder(self.wkb)
+        typ = unpack_from(byteorder+'xi', self.wkb)[0]
+        typ = wkbtype_to_shptype[typ]
+        return typ
 
     def bbox(self):
         # real is below...

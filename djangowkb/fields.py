@@ -28,16 +28,23 @@ class WKBFormField(forms.Field):
 
 
 # https://docs.djangoproject.com/en/3.1/howto/custom-model-fields/
+# TODO: follow this pattern:
+# https://github.com/rpkilby/jsonfield/blob/master/src/jsonfield/fields.py
 
 class WKBField(models.BinaryField):
     description = _("Geometry as WKB")
-    #form_class = WKBFormField
+    form_class = WKBFormField
     dim = 2
     geom_type = 'GEOMETRY'
     editable = True
 
+    def __init__(self, **kwargs):
+        kwargs.setdefault('editable', True)
+        return super(WKBField, self).__init__(**kwargs)
+
     def formfield(self, **kwargs):
         kwargs.setdefault('geom_type', self.geom_type)
+        kwargs['form_class'] = WKBFormField # SHOULDNT HAVE TO SPECIFY THIS, SINCE SET AS CLASS CONSTANT ABOVE?
         return super(WKBField, self).formfield(**kwargs)
 
     def from_db_value(self, value, expression, connection):
@@ -67,6 +74,8 @@ class WKBField(models.BinaryField):
         if isinstance(value, dict):
             # GeoJSON dict, serialize to WKB
             value = WKBGeometry.from_geojson(value)
+        if isinstance(value, WKBGeometry):
+            value = value.wkb
         value = super(WKBField, self).get_db_prep_value(value, connection, prepared)
         return value
 
