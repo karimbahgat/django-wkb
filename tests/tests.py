@@ -29,10 +29,10 @@ class RealWordTestCase(TestCase):
         
         print('loading')
         import sys
-        sys.path.append(r'C:\Users\kimok\OneDrive\Documents\GitHub\pyshp')
+        #sys.path.append(r'C:\Users\kimok\OneDrive\Documents\GitHub\pyshp')
         import shapefile
-        #r = shapefile.Reader(r"C:\Users\kimok\Downloads\ne_10m_admin_1_states_provinces (1)\ne_10m_admin_1_states_provinces.shp")
-        r = shapefile.Reader(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
+        r = shapefile.Reader(r"C:\Users\kimok\Downloads\ne_10m_admin_1_states_provinces (1)\ne_10m_admin_1_states_provinces.shp")
+        #r = shapefile.Reader(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
         #r = shapefile.Reader(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_urban_extent_polygons_v1.01.shp")
         shapes = r.shapes()
         items = [shape.__geo_interface__ for shape in shapes] # items = [(i+1, f.bbox) for i,f in enumerate(d)]
@@ -59,7 +59,7 @@ class RealWordTestCase(TestCase):
 
         print('inserted',CountryDivision.objects.all().count())
 
-        for obj in CountryDivision.objects.all()[:2]:
+        for obj in CountryDivision.objects.all()[:10]:
             print('fetch example',repr(obj.geom))
             geoj = obj.geom.__geo_interface__
             print('geojson',str(geoj)[:100])
@@ -70,6 +70,10 @@ class RealWordTestCase(TestCase):
 #####
 
 class BaseWKBGeometryTest(object):
+
+    def test_wkb_is_valid(self):
+        from shapely.wkb import loads
+        self.assertTrue(bool(loads(self.geom.wkb)))
 
     def test_geom_type(self):
         self.assertEquals(self.geom.geom_type, self.geom_type)
@@ -98,6 +102,46 @@ class LineStringWKBGeometryTest(BaseWKBGeometryTest, TestCase):
     def setUpTestData(cls):
         cls.geoj = {'type': 'LineString', 'coordinates': ((0.0, 0.0),(1.0,1.0),(2.0,2.0))}
         cls.bbox = (0.0,0.0,2.0,2.0)
+        cls.geom_type = cls.geoj['type']
+        cls.geom = WKBGeometry(cls.geoj)
+
+class PolygonWKBGeometryTest(BaseWKBGeometryTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.geoj = {'type': 'Polygon', 'coordinates': (((0.0, 0.0),(0.0,2.0),(2.0,2.0),(2.0,0.0),(0.0,0.0)),
+                                                       ((0.25,0.25),(0.75,0.25),(0.75,0.75),(0.25,0.75),(0.25,0.25)))}
+        cls.bbox = (0.0,0.0,2.0,2.0)
+        cls.geom_type = cls.geoj['type']
+        cls.geom = WKBGeometry(cls.geoj)
+
+class MultiPointWKBGeometryTest(BaseWKBGeometryTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.geoj = {'type': 'MultiPoint', 'coordinates': ((0.0, 0.0),(1.0, 1.0))}
+        cls.bbox = (0.0,0.0,1.0,1.0)
+        cls.geom_type = cls.geoj['type']
+        cls.geom = WKBGeometry(cls.geoj)
+
+class MultiLineStringWKBGeometryTest(BaseWKBGeometryTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.geoj = {'type': 'MultiLineString', 'coordinates': (((0.0, 0.0),(0.0,2.0),(2.0,2.0),(2.0,0.0),(0.0,0.0)),
+                                                               ((0.25,0.25),(0.75,0.25),(0.75,0.75),(0.25,0.75),(0.25,0.25)))}
+        cls.bbox = (0.0,0.0,2.0,2.0)
+        cls.geom_type = cls.geoj['type']
+        cls.geom = WKBGeometry(cls.geoj)
+
+class MultiPolygonWKBGeometryTest(BaseWKBGeometryTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.geoj = {'type': 'MultiPolygon', 'coordinates': [(((0.0, 0.0),(0.0,2.0),(2.0,2.0),(2.0,0.0),(0.0,0.0)),),
+                                                            (((10.25,10.25),(10.75,10.25),(10.75,10.75),(10.25,10.75),(10.25,10.25)),)]
+                    }
+        cls.bbox = (0.0,0.0,10.75,10.75)
         cls.geom_type = cls.geoj['type']
         cls.geom = WKBGeometry(cls.geoj)
 
@@ -273,19 +317,30 @@ class BaseModelFieldTest(object):
 ##                }]
 ##            })
 
-class ModelFieldFromWKBGeometryTest(BaseModelFieldTest, TestCase):
+# MAYBE ACTUALLY JUST HAVE A SEPARATE INIT CLASS, WITH METHODS FOR DIFFERENT INIT TYPES...
+
+class ModelFieldFromWKBTest(BaseModelFieldTest, TestCase):
     
     @classmethod
     def setUpTestData(cls):
-        geom = WKBGeometry({'type': 'Point', 'coordinates': [0, 0]})
+        wkb = WKBGeometry({'type': 'Point', 'coordinates': [0, 0]}).wkb
+        geom = WKBGeometry(wkb)
         cls.address = Address.objects.create(geom=geom)
 
 class ModelFieldFromGeoJSONDictTest(BaseModelFieldTest, TestCase):
     
     @classmethod
     def setUpTestData(cls):
-        geom = WKBGeometry({'type': 'Point', 'coordinates': [0, 0]})
+        geoj = {'type': 'Point', 'coordinates': [0, 0]}
+        geom = WKBGeometry(geoj)
         cls.address = Address.objects.create(geom=geom)
         
+class ModelFieldFromGeoJSONStringTest(BaseModelFieldTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        json_string = json.dumps({'type': 'Point', 'coordinates': [0, 0]})
+        geom = WKBGeometry(json_string)
+        cls.address = Address.objects.create(geom=geom)
 
             

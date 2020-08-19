@@ -92,9 +92,11 @@ class WKBGeometry(object):
             return fmt
 
         def multi(parts, typ):
+            # number of multi parts
             num = len(parts)
             vals.append(num)
             fmt = 'i'
+            # iter parts
             for part in parts:
                 # byteorder
                 vals.append(1) # little endian
@@ -105,13 +107,12 @@ class WKBGeometry(object):
                 fmt += 'i'
                 # coords
                 if 'Point' in typ:
-                    vals.extend(geojson['coordinates'])
+                    vals.extend(part)
                     fmt += 'dd'
                 elif 'LineString' in typ:
-                    fmt += writepoly(geojson['coordinates'])
+                    fmt += writering(part)
                 elif 'Polygon' in typ:
-                    for poly in geojson['coordinates']:
-                        fmt += writepoly(poly)
+                    fmt += writepoly(part)
             return fmt
 
         # first validate
@@ -149,7 +150,7 @@ class WKBGeometry(object):
         elif typ == 'Polygon':
             fmt += writepoly(geojson['coordinates'])
         elif 'Multi' in typ:
-            fmt += multi(geojson['coordinates'], typ)
+            fmt += multi(geojson['coordinates'], typ.replace('Multi',''))
         else:
             raise NotImplementedError('Geometry type {} not yet supported'.format(typ))
 

@@ -92,8 +92,6 @@ class WKBField(models.BinaryField):
 
     def to_python(self, value):
         # used by deserialization and form cleaning
-        value = super(WKBField, self).to_python(value)
-
         if value is None:
             return value
         
@@ -101,10 +99,6 @@ class WKBField(models.BinaryField):
             geom = value
         else:
             geom = WKBGeometry(value)
-
-##        # check correct typ
-##        if self.geom_type != 'GEOMETRY' and self.geom_type != str(geom.geom_type).upper():
-##            raise ValidationError('Field geometry type ({}) is different than the value geometry type ({})'.format(self.geom_type, geom.geom_type))
 
         return geom
 
