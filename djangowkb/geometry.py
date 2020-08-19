@@ -31,9 +31,19 @@ shptype_to_wkbtype = {'Point': 1,
 
 class WKBGeometry(object):
 
-    def __init__(self, wkb, srid=None):
-        self.srid = srid
+    def __init__(self, geo_input, srid=None):
+        if isinstance(geo_input, bytes):
+            wkb = geo_input
+        elif isinstance(geo_input, dict):
+            geom = WKBGeometry.from_geojson_dict(geo_input)
+            wkb = geom.wkb
+        elif isinstance(geo_input, str):
+            geom = WKBGeometry.from_geojson(geo_input)
+            wkb = geom.wkb
+        else:
+            raise ValueError('WKBGeometry input value must be a wkb bytes object, a GeoJSON dict, or GeoJSON string, not {}'.format(geo_input))
         self.wkb = wkb
+        self.srid = srid
 
     @property
     def __geo_interface__(self):
@@ -48,7 +58,13 @@ class WKBGeometry(object):
         return json_string
 
     @staticmethod
-    def from_geojson(geojson):
+    def from_geojson(geojson_string):
+        geojson_dict = json.loads(geojson_string)
+        geom = WKBGeometry.from_geojson_dict(geojson_dict)
+        return geom
+
+    @staticmethod
+    def from_geojson_dict(geojson):
         # shapely
         #from shapely.geometry import asShape
         #wkb = asShape(geojson).wkb
@@ -98,6 +114,10 @@ class WKBGeometry(object):
                         fmt += writepoly(poly)
             return fmt
 
+        # first validate
+        if not isinstance(geojson, dict):
+            raise TypeError('Geojson must be a dict mapping, not {}'.format(geojson))
+
         #stream = BytesIO(self.wkb)
         vals = []
         fmt = ''
@@ -109,7 +129,13 @@ class WKBGeometry(object):
         fmt += 'b'
 
         # type
+        if not 'type' in geojson:
+            raise ValueError('GeoJSON geometry is missing the "type" key'.format(geojson))
         typ = geojson['type']
+        if not typ in shptype_to_wkbtype:
+            raise ValueError('{} is not a valid GeoJSON geometry type'.format(typ))
+        #if typ != 'coordinates' not in geojson:
+        #    raise Exception('GeoJSON geometry {} is missing the "coordinates" key'.format(geojson))
         wkbtyp = shptype_to_wkbtype[typ]
         vals.append(wkbtyp)
         fmt += 'i'
@@ -125,7 +151,7 @@ class WKBGeometry(object):
         elif 'Multi' in typ:
             fmt += multi(geojson['coordinates'], typ)
         else:
-            raise NotImplementedError('Geometry type {}'.format(typ))
+            raise NotImplementedError('Geometry type {} not yet supported'.format(typ))
 
         wkb = pack(fmt, *vals)
         return WKBGeometry(wkb)

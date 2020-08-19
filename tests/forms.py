@@ -5,5 +5,5 @@ from .models import Address
 class AddressForm(ModelForm):
      class Meta:
          model = Address
-         fields = ['geom']
-         #exclude = []
+         #fields = ['geom']
+         exclude = []

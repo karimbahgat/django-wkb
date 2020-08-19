@@ -15,6 +15,31 @@ except ImportError:
 from .geometry import WKBGeometry
 
 
+class WKBValidator(object):
+    def __init__(self, geom_type):
+        self.geom_type = geom_type
+
+    def __call__(self, value):
+        if not isinstance(value, WKBField):
+            try:
+                value = WKBGeometry(value)
+            except Exception as err:
+                #raise Exception(err)
+                raise ValidationError(err)
+        
+        geom_type = value.geom_type
+        if self.geom_type == 'GEOMETRY':
+            is_geometry = geom_type in (
+                "Point", "MultiPoint", "LineString", "MultiLineString",
+                "Polygon", "MultiPolygon", "GeometryCollection"
+            )
+            if not is_geometry:
+                raise ValidationError('{} is not a valid WKB geometry type'.format(geom_type))
+        else:
+            if self.geom_type.lower() != geom_type.lower():
+                raise ValidationError('Value geometry type ({}) is different than the validator geometry type ({})'.format(geom_type, self.geom_type))
+
+
 class WKBFormField(forms.Field):
     widget = LeafletWidget if HAS_LEAFLET else HiddenInput
 
@@ -23,7 +48,7 @@ class WKBFormField(forms.Field):
             import warnings
             warnings.warn('`django-leaflet` is not available.')
         geom_type = kwargs.pop('geom_type')
-        #kwargs.setdefault('validators', [WKBValidator(geom_type)])
+        kwargs.setdefault('validators', [WKBValidator(geom_type)])
         super(WKBFormField, self).__init__(*args, **kwargs)
 
 
@@ -35,16 +60,27 @@ class WKBField(models.BinaryField):
     description = _("Geometry as WKB")
     form_class = WKBFormField
     dim = 2
+    srid = None
     geom_type = 'GEOMETRY'
     editable = True
 
-    def __init__(self, **kwargs):
-        kwargs.setdefault('editable', True)
+    def __init__(self, geom_type=None, srid=None, **kwargs):
+        self.srid = srid
+        if geom_type is not None:
+            self.geom_type = geom_type
+        kwargs.setdefault('editable', True) # parent Binary class is by default not editable
         return super(WKBField, self).__init__(**kwargs)
+
+    def deconstruct(self):
+        # opposite of init
+        name, path, args, kwargs = super(WKBField, self).deconstruct()
+        kwargs['srid'] = self.srid
+        kwargs['geom_type'] = self.geom_type
+        return name, path, args, kwargs
 
     def formfield(self, **kwargs):
         kwargs.setdefault('geom_type', self.geom_type)
-        kwargs['form_class'] = WKBFormField # SHOULDNT HAVE TO SPECIFY THIS, SINCE SET AS CLASS CONSTANT ABOVE?
+        kwargs.setdefault('form_class', WKBFormField) # SHOULDNT HAVE TO SPECIFY THIS, SINCE SET AS CLASS CONSTANT ABOVE?
         return super(WKBField, self).formfield(**kwargs)
 
     def from_db_value(self, value, expression, connection):
@@ -57,28 +93,38 @@ class WKBField(models.BinaryField):
     def to_python(self, value):
         # used by deserialization and form cleaning
         value = super(WKBField, self).to_python(value)
-        
-        if isinstance(value, WKBGeometry):
-            return value
 
         if value is None:
             return value
-
-        return WKBGeometry(value)
-
-    def get_db_prep_value(self, value, connection, prepared=False):
-        # used on db insert
-        if isinstance(value, str):
-            # GeoJSON string
-            value = json.loads(value)
-        if isinstance(value, dict):
-            # GeoJSON dict, serialize to WKB
-            value = WKBGeometry.from_geojson(value)
+        
         if isinstance(value, WKBGeometry):
-            value = value.wkb
-        value = super(WKBField, self).get_db_prep_value(value, connection, prepared)
-        return value
+            geom = value
+        else:
+            geom = WKBGeometry(value)
 
+##        # check correct typ
+##        if self.geom_type != 'GEOMETRY' and self.geom_type != str(geom.geom_type).upper():
+##            raise ValidationError('Field geometry type ({}) is different than the value geometry type ({})'.format(self.geom_type, geom.geom_type))
+
+        return geom
+
+    def get_prep_value(self, value):
+        # used on db insert
+        if not isinstance(value, WKBGeometry):
+            value = WKBGeometry(value)
+            
+##        if isinstance(value, str):
+##            # GeoJSON string
+##            value = json.loads(value)
+##        if isinstance(value, dict):
+##            # GeoJSON dict, serialize to WKB
+##            value = WKBGeometry.from_geojson(value)
+##        if isinstance(value, WKBGeometry):
+##            value = value.wkb
+            
+        value = value.wkb
+        value = super(WKBField, self).get_prep_value(value)
+        return value
 
 
 class GeometryField(WKBField):

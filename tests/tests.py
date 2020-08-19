@@ -90,7 +90,7 @@ class PointWKBGeometryTest(BaseWKBGeometryTest, TestCase):
         cls.geoj = {'type': 'Point', 'coordinates': (0.0, 0.0)}
         cls.bbox = (0.0,0.0,0.0,0.0)
         cls.geom_type = cls.geoj['type']
-        cls.geom = WKBGeometry.from_geojson(cls.geoj)
+        cls.geom = WKBGeometry(cls.geoj)
 
 class LineStringWKBGeometryTest(BaseWKBGeometryTest, TestCase):
     
@@ -99,7 +99,7 @@ class LineStringWKBGeometryTest(BaseWKBGeometryTest, TestCase):
         cls.geoj = {'type': 'LineString', 'coordinates': ((0.0, 0.0),(1.0,1.0),(2.0,2.0))}
         cls.bbox = (0.0,0.0,2.0,2.0)
         cls.geom_type = cls.geoj['type']
-        cls.geom = WKBGeometry.from_geojson(cls.geoj)
+        cls.geom = WKBGeometry(cls.geoj)
 
 #####
 
@@ -200,15 +200,21 @@ class BaseModelFieldTest(object):
 ##        validator = field.validators[0]
 ##        self.assertTrue(isinstance(validator, GeoJSONValidator))
 
-    def test_form_field_raises_if_invalid_type(self):
+    def test_form_field_raises_if_wrong_value(self):
         field = self.address._meta.get_field('geom').formfield()
         self.assertRaises(ValidationError, field.clean,
-                          {'type': 'FeatureCollection', 'foo': 'bar'})
+                          1.0)
 
     def test_form_field_raises_if_type_missing(self):
         field = self.address._meta.get_field('geom').formfield()
         self.assertRaises(ValidationError, field.clean,
                           {'foo': 'bar'})
+
+    def test_form_field_raises_if_invalid_type(self):
+        field = self.address._meta.get_field('geom').formfield()
+        #raise ValidationError(field.clean({'type': 'FeatureCollection', 'foo': 'bar'}))
+        self.assertRaises(ValidationError, field.clean,
+                          {'type': 'FeatureCollection', 'foo': 'bar'})
 
 ##    def test_field_can_be_serialized(self):
 ##        serializer = Serializer()
@@ -271,7 +277,7 @@ class ModelFieldFromWKBGeometryTest(BaseModelFieldTest, TestCase):
     
     @classmethod
     def setUpTestData(cls):
-        geom = WKBGeometry.from_geojson({'type': 'Point', 'coordinates': [0, 0]})
+        geom = WKBGeometry({'type': 'Point', 'coordinates': [0, 0]})
         cls.address = Address.objects.create(geom=geom)
 
 class ModelFieldFromGeoJSONDictTest(BaseModelFieldTest, TestCase):
