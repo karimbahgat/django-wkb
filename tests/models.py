@@ -1,12 +1,12 @@
 from django.db import models
 
-from djangowkb.fields import WKBField
+from djangowkb.fields import GeometryField
 
 class CountryDivision(models.Model):
     name = models.CharField(max_length=20)
-    geom = WKBField()
+    geom = GeometryField()
 
 class Address(models.Model):
-    geom = WKBField()
+    geom = GeometryField()
 
 
