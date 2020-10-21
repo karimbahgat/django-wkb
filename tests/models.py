@@ -4,9 +4,9 @@ from djangowkb.fields import GeometryField
 
 class CountryDivision(models.Model):
     name = models.CharField(max_length=20)
-    geom = GeometryField()
+    geom = GeometryField(blank=True, null=True)
 
 class Address(models.Model):
-    geom = GeometryField()
+    geom = GeometryField(blank=True, null=True)
 
 

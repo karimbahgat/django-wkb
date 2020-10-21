@@ -149,17 +149,20 @@ class MultiPolygonWKBGeometryTest(BaseWKBGeometryTest, TestCase):
 
 class BaseModelFieldTest(object):
 
-    def test_field_value_is_wkbgeometry(self):
-        self.assertIsInstance(self.address.geom, WKBGeometry)
+    def test_field_value_is_correct_type(self):
+        if self.input is None:
+            self.assertEquals(self.address.geom, None)
+        else:
+            self.assertIsInstance(self.address.geom, WKBGeometry)
 
-    def test_field_value_accepts_geojson_dict(self):
-        pass
-
-    def test_field_value_accepts_geojson_string(self):
-        pass
-
-    def test_field_value_accepts_wkbgeometry(self):
-        pass
+##    def test_field_value_accepts_geojson_dict(self):
+##        pass
+##
+##    def test_field_value_accepts_geojson_string(self):
+##        pass
+##
+##    def test_field_value_accepts_wkbgeometry(self):
+##        pass
 
     def test_model_can_save(self):
         pass
@@ -181,6 +184,8 @@ class BaseModelFieldTest(object):
             self.assertIsInstance(field.widget, LeafletWidget)
 
     def test_form_field_widget_renders_as_map(self):
+        if not HAS_LEAFLET:
+            return
 ##        client = Client()
 ##        url = reverse('index')
 ##        response = self.client.get(url)
@@ -231,6 +236,9 @@ class BaseModelFieldTest(object):
     # below is adapted
 
     def test_models_can_have_geojson_fields(self):
+        # ??? WHAT DOES THIS DO?
+        if self.input is None:
+            return
         saved = Address.objects.get(id=self.address.id)
         self.assertEqual(saved.geom.wkb, self.address.geom.wkb)
 ##        if isinstance(saved.geom, dict):
@@ -245,16 +253,22 @@ class BaseModelFieldTest(object):
 ##        self.assertTrue(isinstance(validator, GeoJSONValidator))
 
     def test_form_field_raises_if_wrong_value(self):
+        if self.input is None:
+            return
         field = self.address._meta.get_field('geom').formfield()
         self.assertRaises(ValidationError, field.clean,
                           1.0)
 
     def test_form_field_raises_if_type_missing(self):
+        if self.input is None:
+            return
         field = self.address._meta.get_field('geom').formfield()
         self.assertRaises(ValidationError, field.clean,
                           {'foo': 'bar'})
 
     def test_form_field_raises_if_invalid_type(self):
+        if self.input is None:
+            return
         field = self.address._meta.get_field('geom').formfield()
         #raise ValidationError(field.clean({'type': 'FeatureCollection', 'foo': 'bar'}))
         self.assertRaises(ValidationError, field.clean,
@@ -319,11 +333,19 @@ class BaseModelFieldTest(object):
 
 # MAYBE ACTUALLY JUST HAVE A SEPARATE INIT CLASS, WITH METHODS FOR DIFFERENT INIT TYPES...
 
+class ModelFieldFromNoneTest(BaseModelFieldTest, TestCase):
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.input = None
+        cls.address = Address.objects.create(geom=cls.input)
+
 class ModelFieldFromWKBTest(BaseModelFieldTest, TestCase):
     
     @classmethod
     def setUpTestData(cls):
         wkb = WKBGeometry({'type': 'Point', 'coordinates': [0, 0]}).wkb
+        cls.input = wkb
         geom = WKBGeometry(wkb)
         cls.address = Address.objects.create(geom=geom)
 
@@ -332,6 +354,7 @@ class ModelFieldFromGeoJSONDictTest(BaseModelFieldTest, TestCase):
     @classmethod
     def setUpTestData(cls):
         geoj = {'type': 'Point', 'coordinates': [0, 0]}
+        cls.input = geoj
         geom = WKBGeometry(geoj)
         cls.address = Address.objects.create(geom=geom)
         
@@ -340,6 +363,7 @@ class ModelFieldFromGeoJSONStringTest(BaseModelFieldTest, TestCase):
     @classmethod
     def setUpTestData(cls):
         json_string = json.dumps({'type': 'Point', 'coordinates': [0, 0]})
+        cls.input = json_string
         geom = WKBGeometry(json_string)
         cls.address = Address.objects.create(geom=geom)
 

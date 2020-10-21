@@ -104,6 +104,8 @@ class WKBField(models.BinaryField):
 
     def get_prep_value(self, value):
         # used on db insert
+        if value is None:
+            return value
         if not isinstance(value, WKBGeometry):
             value = WKBGeometry(value)
             
