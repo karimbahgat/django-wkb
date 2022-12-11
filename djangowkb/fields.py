@@ -102,6 +102,11 @@ class WKBField(models.BinaryField):
 
         return geom
 
+    def value_to_string(self, obj):
+        # used by serializer
+        geom = self.value_from_object(obj)
+        return geom
+
     def get_prep_value(self, value):
         # used on db insert
         if value is None:

@@ -164,6 +164,39 @@ class WKBGeometry(object):
         typ = wkbtype_to_shptype[typ]
         return typ
 
+    # def iter_coords(self):
+    #     # not finished
+    #     # can maybe be reused for geo interface... 
+    #     stream = BytesIO(self.wkb)
+    #     byteorder = _wkb_byteorder(stream.read(1))
+    #     wkbtyp = unpack(byteorder+'i', stream.read(4))[0]
+    #     typ = wkbtype_to_shptype[wkbtyp]
+    #     if typ == 'Point':
+    #         xy = unpack(byteorder+'dd', stream.read(8*2))
+    #         yield xy
+    #     elif typ == 'LineString':
+    #         coords = getring(stream)
+    #         yield coords
+    #     elif typ == 'Polygon':
+    #         for coords in getpoly(stream):
+    #             yield coords
+    #     elif typ == 'MultiPoint':
+    #         num = unpack(byteorder+'i', stream.read(4))[0]
+    #         flat = unpack(byteorder+'5xdd'*(num), stream.read((5+16)*num))
+    #         xs,ys = islice(flat,0,None,2), islice(flat,1,None,2)
+    #         coords = zip(xs,ys)
+    #         yield coords
+    #     elif typ == 'MultiLineString':
+    #         num = unpack(byteorder+'i', stream.read(4))[0]
+    #         for _ in range(num):
+    #             coords = getring(multi(stream))
+    #             yield coords
+    #     elif typ == 'MultiLineString':
+    #         num = unpack(byteorder+'i', stream.read(4))[0]
+    #         for _ in range(num):
+    #             for coords in getring(multi(stream)):
+    #                 yield coords
+
     def bbox(self):
         # real is below...
         def ringbox(stream):
